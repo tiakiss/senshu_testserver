@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // アプリケーションの状態
   const state = {
     filters: {
+      dateFrom: null,
+      dateTo: null,
       servers: ['all'],
       localIp: 'all',
       remoteIp: 'all',
@@ -37,10 +39,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const elements = {
     dashboard: document.getElementById('dashboard'),
     loading: document.getElementById('loading'),
+    dateFrom: document.getElementById('date-from'),
+    dateTo: document.getElementById('date-to'),
     serverFilter: document.getElementById('server-filter'),
     localIpFilter: document.getElementById('local-ip-filter'),
     remoteIpFilter: document.getElementById('remote-ip-filter'),
     portFilter: document.getElementById('port-filter'),
+    applyFiltersBtn: document.getElementById('apply-filters'),
+    resetFiltersBtn: document.getElementById('reset-filters'),
     connectionCount: document.getElementById('connection-count'),
     uniqueIpCount: document.getElementById('unique-ip-count'),
     topAttacker: document.getElementById('top-attacker'),
@@ -101,6 +107,24 @@ document.addEventListener('DOMContentLoaded', function() {
   function initializeFilters() {
     console.log('フィルター初期化中...');
     
+    // 日付フィルターの初期化
+    const today = new Date();
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(today.getMonth() - 1);
+    
+    // 日付をYYYY-MM-DD形式に変換する関数
+    function formatDateForInput(date) {
+      return date.toISOString().split('T')[0];
+    }
+    
+    // 初期日付を設定
+    elements.dateFrom.value = formatDateForInput(oneMonthAgo);
+    elements.dateTo.value = formatDateForInput(today);
+    
+    // 状態を更新
+    state.filters.dateFrom = elements.dateFrom.value;
+    state.filters.dateTo = elements.dateTo.value;
+    
     // サーバーフィルター
     initializeMultiSelectFilter(
       elements.serverFilter,
@@ -110,7 +134,6 @@ document.addEventListener('DOMContentLoaded', function() {
       (selected) => {
         console.log('サーバーフィルター変更:', selected);
         state.filters.servers = selected;
-        refreshDashboard();
       }
     );
     
@@ -121,7 +144,6 @@ document.addEventListener('DOMContentLoaded', function() {
       state.filters.localIp,
       (selected) => {
         state.filters.localIp = selected;
-        refreshDashboard();
       }
     );
     
@@ -132,7 +154,6 @@ document.addEventListener('DOMContentLoaded', function() {
       state.filters.remoteIp,
       (selected) => {
         state.filters.remoteIp = selected;
-        refreshDashboard();
       }
     );
     
@@ -145,9 +166,42 @@ document.addEventListener('DOMContentLoaded', function() {
       (selected) => {
         console.log('ポートフィルター変更:', selected);
         state.filters.ports = selected;
-        refreshDashboard();
       }
     );
+    
+    // フィルター適用ボタンのイベントハンドラ
+    elements.applyFiltersBtn.addEventListener('click', () => {
+      // 日付フィルターの値を更新
+      state.filters.dateFrom = elements.dateFrom.value;
+      state.filters.dateTo = elements.dateTo.value;
+      
+      // ダッシュボードを更新
+      refreshDashboard();
+    });
+    
+    // フィルターリセットボタンのイベントハンドラ
+    elements.resetFiltersBtn.addEventListener('click', () => {
+      // 日付フィルターをリセット
+      elements.dateFrom.value = formatDateForInput(oneMonthAgo);
+      elements.dateTo.value = formatDateForInput(today);
+      state.filters.dateFrom = elements.dateFrom.value;
+      state.filters.dateTo = elements.dateTo.value;
+      
+      // その他のフィルターをリセット
+      state.filters.servers = ['all'];
+      state.filters.localIp = 'all';
+      state.filters.remoteIp = 'all';
+      state.filters.ports = ['all'];
+      
+      // UIを更新
+      $(elements.serverFilter).val(['all']).trigger('change.select2');
+      $(elements.localIpFilter).val('all');
+      $(elements.remoteIpFilter).val('all');
+      $(elements.portFilter).val(['all']).trigger('change.select2');
+      
+      // ダッシュボードを更新
+      refreshDashboard();
+    });
     
     console.log('フィルター初期化完了');
   }
@@ -192,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
     element.appendChild(allOption);
     
     // その他のオプション
-    options.forEach((option, index) => {
+    options.forEach((option) => {
       const optionElement = document.createElement('option');
       optionElement.value = option; // 直接オプション値を使用
       optionElement.textContent = option;
@@ -200,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     try {
-      // イベントハンドラを一旦解除して、再帰呼び出しを防止
+      // select2を初期化する前にイベントハンドラをクリア
       $(element).off('change');
       
       // 複数選択の設定
@@ -223,11 +277,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (selectedOptions.includes('all')) {
           // 「すべて」が選択されている場合、他のオプションをクリア
-          $(this).val(['all']);
+          $(this).val(['all']).trigger('change.select2');
           onChange(['all']);
         } else if (selectedOptions.length === 0) {
           // 何も選択されていない場合、「すべて」を選択
-          $(this).val(['all']);
+          $(this).val(['all']).trigger('change.select2');
           onChange(['all']);
         } else {
           // 実際の値をそのまま使用
@@ -240,15 +294,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 0);
       });
       
-      // 現在の値を設定（イベント発火なし）
+      // 現在の値を設定（イベント発火は表示更新のみ）
       if (selectedValues.includes('all')) {
-        $(element).val(['all']);
+        $(element).val(['all']).trigger('change.select2');
       } else {
-        $(element).val(selectedValues);
+        $(element).val(selectedValues).trigger('change.select2');
       }
-      
-      // 初期表示を更新
-      $(element).trigger('change.select2');
       
     } catch (error) {
       console.error('Select2初期化エラー:', error);
@@ -300,21 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
       };
       
       // フィルターの適用
-      if (!state.filters.servers.includes('all')) {
-        params.servers = state.filters.servers.join(',');
-      }
-      
-      if (state.filters.localIp !== 'all') {
-        params.localIp = state.filters.localIp;
-      }
-      
-      if (state.filters.remoteIp !== 'all') {
-        params.remoteIp = state.filters.remoteIp;
-      }
-      
-      if (!state.filters.ports.includes('all')) {
-        params.ports = state.filters.ports.join(',');
-      }
+      applyFiltersToParams(params);
       
       console.log('APIリクエストパラメータ:', params);
       
@@ -333,6 +370,38 @@ document.addEventListener('DOMContentLoaded', function() {
       throw error;
     }
   }
+  
+  // APIパラメータにフィルターを適用する関数
+  function applyFiltersToParams(params) {
+    // 日付フィルター
+    if (state.filters.dateFrom) {
+      params.dateFrom = state.filters.dateFrom;
+    }
+    
+    if (state.filters.dateTo) {
+      params.dateTo = state.filters.dateTo;
+    }
+    
+    // サーバーフィルター
+    if (state.filters.servers && !state.filters.servers.includes('all')) {
+      params.servers = state.filters.servers.join(',');
+    }
+    
+    // ローカルIPフィルター
+    if (state.filters.localIp && state.filters.localIp !== 'all') {
+      params.localIp = state.filters.localIp;
+    }
+    
+    // リモートIPフィルター
+    if (state.filters.remoteIp && state.filters.remoteIp !== 'all') {
+      params.remoteIp = state.filters.remoteIp;
+    }
+    
+    // ポートフィルター
+    if (state.filters.ports && !state.filters.ports.includes('all')) {
+      params.ports = state.filters.ports.join(',');
+    }
+  }
 
   // 統計データを取得
   async function fetchStats() {
@@ -343,21 +412,7 @@ document.addEventListener('DOMContentLoaded', function() {
       const params = {};
       
       // フィルターの適用
-      if (!state.filters.servers.includes('all')) {
-        params.servers = state.filters.servers.join(',');
-      }
-      
-      if (state.filters.localIp !== 'all') {
-        params.localIp = state.filters.localIp;
-      }
-      
-      if (state.filters.remoteIp !== 'all') {
-        params.remoteIp = state.filters.remoteIp;
-      }
-      
-      if (!state.filters.ports.includes('all')) {
-        params.ports = state.filters.ports.join(',');
-      }
+      applyFiltersToParams(params);
       
       console.log('APIリクエストパラメータ:', params);
       

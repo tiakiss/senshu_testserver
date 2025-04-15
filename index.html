@@ -30,6 +30,14 @@
                 <h2>フィルター</h2>
                 <div class="filters-container">
                     <div class="filter-group">
+                        <label for="date-from">開始日:</label>
+                        <input type="date" id="date-from" class="date-filter">
+                    </div>
+                    <div class="filter-group">
+                        <label for="date-to">終了日:</label>
+                        <input type="date" id="date-to" class="date-filter">
+                    </div>
+                    <div class="filter-group">
                         <label for="server-filter">サーバー:</label>
                         <select id="server-filter" multiple></select>
                     </div>
@@ -45,6 +53,10 @@
                         <label for="port-filter">ポート:</label>
                         <select id="port-filter" multiple></select>
                     </div>
+                </div>
+                <div class="filter-buttons">
+                    <button id="apply-filters" class="filter-button primary">フィルター適用</button>
+                    <button id="reset-filters" class="filter-button">リセット</button>
                 </div>
             </section>
 

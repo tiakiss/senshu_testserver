@@ -66,10 +66,25 @@ try {
     $localIp = isset($_GET['localIp']) ? $_GET['localIp'] : null;
     $remoteIp = isset($_GET['remoteIp']) ? $_GET['remoteIp'] : null;
     $ports = isset($_GET['ports']) ? explode(',', $_GET['ports']) : null;
+    
+    // 日付フィルター
+    $dateFrom = isset($_GET['dateFrom']) ? $_GET['dateFrom'] : null;
+    $dateTo = isset($_GET['dateTo']) ? $_GET['dateTo'] : null;
 
     // クエリの構築
     $where_conditions = [];
     $params = [];
+
+    // 日付フィルターの適用
+    if ($dateFrom) {
+        $where_conditions[] = "timestamp::date >= :date_from";
+        $params['date_from'] = $dateFrom;
+    }
+    
+    if ($dateTo) {
+        $where_conditions[] = "timestamp::date <= :date_to";
+        $params['date_to'] = $dateTo;
+    }
 
     if ($servers !== null && !empty($servers) && !in_array('all', $servers)) {
         $server_placeholders = [];
