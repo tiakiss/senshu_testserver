@@ -23,6 +23,9 @@ $db_config = [
     'port' => '5432'
 ];
 
+// テーブル名
+$table_name = 'netstat_date';
+
 try {
     // データベース接続
     $dsn = "pgsql:host={$db_config['host']};port={$db_config['port']};dbname={$db_config['dbname']};";
@@ -31,6 +34,32 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false
     ]);
+
+    // テーブル情報を取得して確認
+    try {
+        $tables_sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';";
+        $tables_stmt = $pdo->query($tables_sql);
+        $tables = $tables_stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if (!in_array($table_name, $tables)) {
+            throw new Exception("'{$table_name}'テーブルが存在しません。存在するテーブル: " . implode(', ', $tables));
+        }
+        
+        // テーブルのカラム確認
+        $columns_sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '{$table_name}';";
+        $columns_stmt = $pdo->query($columns_sql);
+        $columns = $columns_stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // カラムの存在をログに出力（デバッグ用）
+        error_log("テーブルのカラム: " . implode(", ", $columns));
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => true,
+            'message' => 'テーブル構造エラー: ' . $e->getMessage()
+        ]);
+        exit;
+    }
 
     // パラメータの取得
     $servers = isset($_GET['servers']) ? explode(',', $_GET['servers']) : null;
@@ -74,7 +103,7 @@ try {
 
     // リモートIP別の統計
     $remoteIp_sql = "SELECT remote_ip as value, COUNT(*) as count 
-                     FROM connections 
+                     FROM {$table_name} 
                      {$where_clause} 
                      GROUP BY remote_ip 
                      ORDER BY count DESC";
@@ -88,7 +117,7 @@ try {
 
     // サーバー別の統計
     $server_sql = "SELECT servername as value, COUNT(*) as count 
-                  FROM connections 
+                  FROM {$table_name} 
                   {$where_clause} 
                   GROUP BY servername 
                   ORDER BY count DESC";
@@ -102,7 +131,7 @@ try {
 
     // ポート別の統計
     $port_sql = "SELECT port as value, COUNT(*) as count 
-                FROM connections 
+                FROM {$table_name} 
                 {$where_clause} 
                 GROUP BY port 
                 ORDER BY count DESC";

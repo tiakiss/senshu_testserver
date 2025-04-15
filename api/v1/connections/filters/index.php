@@ -38,22 +38,30 @@ try {
         $tables_stmt = $pdo->query($tables_sql);
         $tables = $tables_stmt->fetchAll(PDO::FETCH_COLUMN);
         
-        if (!in_array('connections', $tables)) {
-            throw new Exception("'connections'テーブルが存在しません。存在するテーブル: " . implode(', ', $tables));
+        // テーブル名が netstat_date の場合
+        $table_name = 'netstat_date';
+        
+        if (!in_array($table_name, $tables)) {
+            throw new Exception("'{$table_name}'テーブルが存在しません。存在するテーブル: " . implode(', ', $tables));
         }
         
         // テーブルのカラム確認
-        $columns_sql = "SELECT column_name FROM information_schema.columns WHERE table_name = 'connections';";
+        $columns_sql = "SELECT column_name FROM information_schema.columns WHERE table_name = '{$table_name}';";
         $columns_stmt = $pdo->query($columns_sql);
         $columns = $columns_stmt->fetchAll(PDO::FETCH_COLUMN);
         
-        // 必要なカラムの存在チェック
-        $required_columns = ['id', 'timestamp', 'servername', 'local_ip', 'remote_ip', 'port', 'state'];
-        $missing_columns = [];
+        // カラムの存在チェック
+        $column_mappings = [
+            'servername' => 'サーバー名',
+            'local_ip' => 'ローカルIP',
+            'remote_ip' => 'リモートIP',
+            'port' => 'ポート'
+        ];
         
-        foreach ($required_columns as $column) {
+        $missing_columns = [];
+        foreach ($column_mappings as $column => $label) {
             if (!in_array($column, $columns)) {
-                $missing_columns[] = $column;
+                $missing_columns[] = "{$column} ({$label})";
             }
         }
         
@@ -70,22 +78,22 @@ try {
     }
 
     // サーバー一覧を取得
-    $server_sql = "SELECT DISTINCT servername FROM connections ORDER BY servername";
+    $server_sql = "SELECT DISTINCT servername FROM {$table_name} ORDER BY servername";
     $server_stmt = $pdo->query($server_sql);
     $servers = $server_stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // ローカルIP一覧を取得
-    $localIp_sql = "SELECT DISTINCT local_ip FROM connections ORDER BY local_ip";
+    $localIp_sql = "SELECT DISTINCT local_ip FROM {$table_name} ORDER BY local_ip";
     $localIp_stmt = $pdo->query($localIp_sql);
     $localIps = $localIp_stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // リモートIP一覧を取得
-    $remoteIp_sql = "SELECT DISTINCT remote_ip FROM connections ORDER BY remote_ip";
+    $remoteIp_sql = "SELECT DISTINCT remote_ip FROM {$table_name} ORDER BY remote_ip";
     $remoteIp_stmt = $pdo->query($remoteIp_sql);
     $remoteIps = $remoteIp_stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // ポート一覧を取得
-    $port_sql = "SELECT DISTINCT port FROM connections ORDER BY port";
+    $port_sql = "SELECT DISTINCT port FROM {$table_name} ORDER BY port";
     $port_stmt = $pdo->query($port_sql);
     $ports = $port_stmt->fetchAll(PDO::FETCH_COLUMN);
 
