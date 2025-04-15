@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // データベース設定
 $db_config = [
     'host' => 'localhost',
-    'dbname' => 'netstat_date'
+    'dbname' => 'netstat_date',
     'user' => 'senshu', // PostgreSQLのユーザー名
     'password' => 'postgres', // パスワードは適切なものに変更してください
     'port' => '5432'
@@ -29,15 +29,12 @@ try {
     ]);
 
     // パラメータの取得
-    $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
     $servers = isset($_GET['servers']) ? explode(',', $_GET['servers']) : null;
     $localIp = isset($_GET['localIp']) ? $_GET['localIp'] : null;
     $remoteIp = isset($_GET['remoteIp']) ? $_GET['remoteIp'] : null;
     $ports = isset($_GET['ports']) ? explode(',', $_GET['ports']) : null;
 
     // クエリの構築
-    $offset = ($page - 1) * $limit;
     $where_conditions = [];
     $params = [];
 
@@ -71,38 +68,53 @@ try {
 
     $where_clause = !empty($where_conditions) ? "WHERE " . implode(' AND ', $where_conditions) : "";
 
-    // 総件数の取得
-    $count_sql = "SELECT COUNT(*) as total FROM connections {$where_clause}";
-    $count_stmt = $pdo->prepare($count_sql);
-    foreach ($params as $key => $value) {
-        $count_stmt->bindValue(":{$key}", $value);
-    }
-    $count_stmt->execute();
-    $total = $count_stmt->fetch()['total'];
-
-    // データの取得
-    $sql = "SELECT id, timestamp, server, local_ip as localIp, remote_ip as remoteIp, port, status 
-            FROM connections 
-            {$where_clause} 
-            ORDER BY timestamp DESC 
-            LIMIT :limit OFFSET :offset";
+    // リモートIP別の統計
+    $remoteIp_sql = "SELECT remote_ip as value, COUNT(*) as count 
+                     FROM connections 
+                     {$where_clause} 
+                     GROUP BY remote_ip 
+                     ORDER BY count DESC";
     
-    $stmt = $pdo->prepare($sql);
+    $remoteIp_stmt = $pdo->prepare($remoteIp_sql);
     foreach ($params as $key => $value) {
-        $stmt->bindValue(":{$key}", $value);
+        $remoteIp_stmt->bindValue(":{$key}", $value);
     }
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $connections = $stmt->fetchAll();
+    $remoteIp_stmt->execute();
+    $remoteIp_stats = $remoteIp_stmt->fetchAll();
+
+    // サーバー別の統計
+    $server_sql = "SELECT server as value, COUNT(*) as count 
+                  FROM connections 
+                  {$where_clause} 
+                  GROUP BY server 
+                  ORDER BY count DESC";
+    
+    $server_stmt = $pdo->prepare($server_sql);
+    foreach ($params as $key => $value) {
+        $server_stmt->bindValue(":{$key}", $value);
+    }
+    $server_stmt->execute();
+    $server_stats = $server_stmt->fetchAll();
+
+    // ポート別の統計
+    $port_sql = "SELECT port as value, COUNT(*) as count 
+                FROM connections 
+                {$where_clause} 
+                GROUP BY port 
+                ORDER BY count DESC";
+    
+    $port_stmt = $pdo->prepare($port_sql);
+    foreach ($params as $key => $value) {
+        $port_stmt->bindValue(":{$key}", $value);
+    }
+    $port_stmt->execute();
+    $port_stats = $port_stmt->fetchAll();
 
     // 結果を返す
     echo json_encode([
-        'connections' => $connections,
-        'total' => $total,
-        'page' => $page,
-        'limit' => $limit,
-        'pages' => ceil($total / $limit)
+        'remoteIp' => $remoteIp_stats,
+        'server' => $server_stats,
+        'port' => $port_stats
     ]);
 
 } catch (PDOException $e) {
