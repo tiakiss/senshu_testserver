@@ -1,4 +1,8 @@
 <?php
+// デバッグ用に全てのエラーを表示
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // 必要なヘッダー設定
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -14,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $db_config = [
     'host' => 'localhost',
     'dbname' => 'netstat_date',
-    'user' => 'senshu', // PostgreSQLのユーザー名
-    'password' => 'postgres', // パスワードは適切なものに変更してください
+    'user' => 'senshu',
+    'password' => 'postgres',
     'port' => '5432'
 ];
 
@@ -41,7 +45,7 @@ try {
     $where_conditions = [];
     $params = [];
 
-    if ($servers !== null && !empty($servers)) {
+    if ($servers !== null && !empty($servers) && !in_array('all', $servers)) {
         $server_placeholders = [];
         foreach ($servers as $i => $server) {
             $server_placeholders[] = ":server{$i}";
@@ -60,11 +64,11 @@ try {
         $params['remote_ip'] = $remoteIp;
     }
 
-    if ($ports !== null && !empty($ports)) {
+    if ($ports !== null && !empty($ports) && !in_array('all', $ports)) {
         $port_placeholders = [];
         foreach ($ports as $i => $port) {
             $port_placeholders[] = ":port{$i}";
-            $params["port{$i}"] = $port;
+            $params["port{$i}"] = intval($port);
         }
         $where_conditions[] = "port IN (" . implode(', ', $port_placeholders) . ")";
     }
@@ -110,6 +114,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'error' => true,
-        'message' => 'データベースエラー: ' . $e->getMessage()
+        'message' => 'データベースエラー: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine(),
+        'trace' => $e->getTraceAsString()
     ]);
 }

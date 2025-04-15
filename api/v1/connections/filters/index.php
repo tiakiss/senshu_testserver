@@ -1,4 +1,8 @@
 <?php
+// デバッグ用に全てのエラーを表示
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // 必要なヘッダー設定
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -14,8 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $db_config = [
     'host' => 'localhost',
     'dbname' => 'netstat_date',
-    'user' => 'senshu', // PostgreSQLのユーザー名
-    'password' => 'postgres', // パスワードは適切なものに変更してください
+    'user' => 'senshu',
+    'password' => 'postgres',
     'port' => '5432'
 ];
 
@@ -27,6 +31,43 @@ try {
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES => false
     ]);
+    
+    // テーブル情報を取得して確認
+    try {
+        $tables_sql = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';";
+        $tables_stmt = $pdo->query($tables_sql);
+        $tables = $tables_stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        if (!in_array('connections', $tables)) {
+            throw new Exception("'connections'テーブルが存在しません。存在するテーブル: " . implode(', ', $tables));
+        }
+        
+        // テーブルのカラム確認
+        $columns_sql = "SELECT column_name FROM information_schema.columns WHERE table_name = 'connections';";
+        $columns_stmt = $pdo->query($columns_sql);
+        $columns = $columns_stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // 必要なカラムの存在チェック
+        $required_columns = ['id', 'timestamp', 'servername', 'local_ip', 'remote_ip', 'port', 'state'];
+        $missing_columns = [];
+        
+        foreach ($required_columns as $column) {
+            if (!in_array($column, $columns)) {
+                $missing_columns[] = $column;
+            }
+        }
+        
+        if (!empty($missing_columns)) {
+            throw new Exception("次のカラムが存在しません: " . implode(', ', $missing_columns) . ". 存在するカラム: " . implode(', ', $columns));
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'error' => true,
+            'message' => 'テーブル構造エラー: ' . $e->getMessage()
+        ]);
+        exit;
+    }
 
     // サーバー一覧を取得
     $server_sql = "SELECT DISTINCT servername FROM connections ORDER BY servername";
@@ -61,6 +102,7 @@ try {
     http_response_code(500);
     echo json_encode([
         'error' => true,
-        'message' => 'データベースエラー: ' . $e->getMessage()
+        'message' => 'データベースエラー: ' . $e->getMessage() . ' in ' . $e->getFile() . ' on line ' . $e->getLine(),
+        'trace' => $e->getTraceAsString()
     ]);
 }
