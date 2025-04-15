@@ -28,81 +28,32 @@ try {
         PDO::ATTR_EMULATE_PREPARES => false
     ]);
 
-    // パラメータの取得
-    $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-    $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 10;
-    $servers = isset($_GET['servers']) ? explode(',', $_GET['servers']) : null;
-    $localIp = isset($_GET['localIp']) ? $_GET['localIp'] : null;
-    $remoteIp = isset($_GET['remoteIp']) ? $_GET['remoteIp'] : null;
-    $ports = isset($_GET['ports']) ? explode(',', $_GET['ports']) : null;
+    // サーバー一覧を取得
+    $server_sql = "SELECT DISTINCT servername FROM connections ORDER BY servername";
+    $server_stmt = $pdo->query($server_sql);
+    $servers = $server_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-    // クエリの構築
-    $offset = ($page - 1) * $limit;
-    $where_conditions = [];
-    $params = [];
+    // ローカルIP一覧を取得
+    $localIp_sql = "SELECT DISTINCT local_ip FROM connections ORDER BY local_ip";
+    $localIp_stmt = $pdo->query($localIp_sql);
+    $localIps = $localIp_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-    if ($servers !== null && !empty($servers)) {
-        $server_placeholders = [];
-        foreach ($servers as $i => $server) {
-            $server_placeholders[] = ":server{$i}";
-            $params["server{$i}"] = $server;
-        }
-        $where_conditions[] = "server IN (" . implode(', ', $server_placeholders) . ")";
-    }
+    // リモートIP一覧を取得
+    $remoteIp_sql = "SELECT DISTINCT remote_ip FROM connections ORDER BY remote_ip";
+    $remoteIp_stmt = $pdo->query($remoteIp_sql);
+    $remoteIps = $remoteIp_stmt->fetchAll(PDO::FETCH_COLUMN);
 
-    if ($localIp !== null && $localIp !== 'all') {
-        $where_conditions[] = "local_ip = :local_ip";
-        $params['local_ip'] = $localIp;
-    }
-
-    if ($remoteIp !== null && $remoteIp !== 'all') {
-        $where_conditions[] = "remote_ip = :remote_ip";
-        $params['remote_ip'] = $remoteIp;
-    }
-
-    if ($ports !== null && !empty($ports)) {
-        $port_placeholders = [];
-        foreach ($ports as $i => $port) {
-            $port_placeholders[] = ":port{$i}";
-            $params["port{$i}"] = $port;
-        }
-        $where_conditions[] = "port IN (" . implode(', ', $port_placeholders) . ")";
-    }
-
-    $where_clause = !empty($where_conditions) ? "WHERE " . implode(' AND ', $where_conditions) : "";
-
-    // 総件数の取得
-    $count_sql = "SELECT COUNT(*) as total FROM connections {$where_clause}";
-    $count_stmt = $pdo->prepare($count_sql);
-    foreach ($params as $key => $value) {
-        $count_stmt->bindValue(":{$key}", $value);
-    }
-    $count_stmt->execute();
-    $total = $count_stmt->fetch()['total'];
-
-    // データの取得
-    $sql = "SELECT id, timestamp, server, local_ip as localIp, remote_ip as remoteIp, port, status 
-            FROM connections 
-            {$where_clause} 
-            ORDER BY timestamp DESC 
-            LIMIT :limit OFFSET :offset";
-    
-    $stmt = $pdo->prepare($sql);
-    foreach ($params as $key => $value) {
-        $stmt->bindValue(":{$key}", $value);
-    }
-    $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $stmt->execute();
-    $connections = $stmt->fetchAll();
+    // ポート一覧を取得
+    $port_sql = "SELECT DISTINCT port FROM connections ORDER BY port";
+    $port_stmt = $pdo->query($port_sql);
+    $ports = $port_stmt->fetchAll(PDO::FETCH_COLUMN);
 
     // 結果を返す
     echo json_encode([
-        'connections' => $connections,
-        'total' => $total,
-        'page' => $page,
-        'limit' => $limit,
-        'pages' => ceil($total / $limit)
+        'servers' => $servers,
+        'localIps' => $localIps,
+        'remoteIps' => $remoteIps,
+        'ports' => $ports
     ]);
 
 } catch (PDOException $e) {

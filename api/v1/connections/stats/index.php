@@ -13,9 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 // データベース設定
 $db_config = [
     'host' => 'localhost',
-    'dbname' => 'connections_db',
-    'user' => 'postgres', // PostgreSQLのユーザー名
-    'password' => 'your_password', // パスワードは適切なものに変更してください
+    'dbname' => 'netstat_date',
+    'user' => 'senshu', // PostgreSQLのユーザー名
+    'password' => 'postgres', // パスワードは適切なものに変更してください
     'port' => '5432'
 ];
 
@@ -44,7 +44,7 @@ try {
             $server_placeholders[] = ":server{$i}";
             $params["server{$i}"] = $server;
         }
-        $where_conditions[] = "server IN (" . implode(', ', $server_placeholders) . ")";
+        $where_conditions[] = "servername IN (" . implode(', ', $server_placeholders) . ")";
     }
 
     if ($localIp !== null && $localIp !== 'all') {
@@ -83,10 +83,10 @@ try {
     $remoteIp_stats = $remoteIp_stmt->fetchAll();
 
     // サーバー別の統計
-    $server_sql = "SELECT server as value, COUNT(*) as count 
+    $server_sql = "SELECT servername as value, COUNT(*) as count 
                   FROM connections 
                   {$where_clause} 
-                  GROUP BY server 
+                  GROUP BY servername 
                   ORDER BY count DESC";
     
     $server_stmt = $pdo->prepare($server_sql);
