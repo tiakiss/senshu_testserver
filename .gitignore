@@ -1,4 +1,4 @@
-# OS generated files
+# OS生成ファイル
 .DS_Store
 .DS_Store?
 ._*
@@ -7,31 +7,32 @@
 ehthumbs.db
 Thumbs.db
 
-# IDE and editor files
+# IDE・エディタファイル
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# Logs
+# ログ
 logs
 *.log
 npm-debug.log*
 
-# Dependencies
+# 依存関係
 node_modules/
 vendor/
 
-# Build output
+# ビルド出力
 dist/
 build/
 out/
 
-# Environment variables
+# 環境変数と秘密の設定ファイル
 .env
 .env.local
 .env.*.local
+config/database.js
 
-# Cache
-.cache/ 
+# キャッシュ
+.cache/
