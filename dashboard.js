@@ -171,9 +171,28 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // フィルター適用ボタンのイベントハンドラ
     elements.applyFiltersBtn.addEventListener('click', () => {
+      console.log('フィルター適用ボタンがクリックされました');
+      
       // 日付フィルターの値を更新
       state.filters.dateFrom = elements.dateFrom.value;
       state.filters.dateTo = elements.dateTo.value;
+      
+      // 現在の選択状態を確認して状態を更新
+      // サーバーフィルター
+      const serverSelectedValues = $(elements.serverFilter).val() || [];
+      state.filters.servers = serverSelectedValues.includes('all') ? ['all'] : serverSelectedValues;
+      console.log('適用するサーバーフィルター:', state.filters.servers);
+      
+      // ローカルIPフィルター
+      state.filters.localIp = elements.localIpFilter.value;
+      
+      // リモートIPフィルター
+      state.filters.remoteIp = elements.remoteIpFilter.value;
+      
+      // ポートフィルター
+      const portSelectedValues = $(elements.portFilter).val() || [];
+      state.filters.ports = portSelectedValues.includes('all') ? ['all'] : portSelectedValues;
+      console.log('適用するポートフィルター:', state.filters.ports);
       
       // ダッシュボードを更新
       refreshDashboard();
@@ -236,6 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // 複数選択フィルターの初期化
   function initializeMultiSelectFilter(element, options, optionPrefix, selectedValues, onChange) {
+    console.log(`${optionPrefix}フィルター初期化開始: 選択値=`, selectedValues);
+    
     // 既存のオプションをクリア
     element.innerHTML = '';
     
@@ -273,7 +294,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (isUpdating) return;
         
         isUpdating = true;
+        
+        // 選択された値を取得 (配列)
         const selectedOptions = $(this).val() || [];
+        console.log(`${optionPrefix}フィルター変更イベント:`, selectedOptions);
         
         if (selectedOptions.includes('all')) {
           // 「すべて」が選択されている場合、他のオプションをクリア
@@ -284,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
           $(this).val(['all']).trigger('change.select2');
           onChange(['all']);
         } else {
-          // 実際の値をそのまま使用
+          // 「すべて」以外が選択されている場合、実際の値をそのまま適用
           onChange(selectedOptions);
         }
         
@@ -301,8 +325,9 @@ document.addEventListener('DOMContentLoaded', function() {
         $(element).val(selectedValues).trigger('change.select2');
       }
       
+      console.log(`${optionPrefix}フィルター初期化完了`);
     } catch (error) {
-      console.error('Select2初期化エラー:', error);
+      console.error(`${optionPrefix}フィルター初期化エラー:`, error);
       // フォールバック: 通常のセレクトボックスとして機能させる
       element.multiple = true;
       element.addEventListener('change', function() {
@@ -373,6 +398,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // APIパラメータにフィルターを適用する関数
   function applyFiltersToParams(params) {
+    console.log('フィルター適用前のパラメータ:', { ...params });
+    console.log('現在のフィルター状態:', { ...state.filters });
+    
     // 日付フィルター
     if (state.filters.dateFrom) {
       params.dateFrom = state.filters.dateFrom;
@@ -383,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // サーバーフィルター
-    if (state.filters.servers && !state.filters.servers.includes('all')) {
+    if (state.filters.servers && state.filters.servers.length > 0 && !state.filters.servers.includes('all')) {
       params.servers = state.filters.servers.join(',');
     }
     
@@ -398,9 +426,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // ポートフィルター
-    if (state.filters.ports && !state.filters.ports.includes('all')) {
+    if (state.filters.ports && state.filters.ports.length > 0 && !state.filters.ports.includes('all')) {
       params.ports = state.filters.ports.join(',');
     }
+    
+    console.log('フィルター適用後のパラメータ:', { ...params });
   }
 
   // 統計データを取得
