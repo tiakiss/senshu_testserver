@@ -1,5 +1,5 @@
 /**
- * 攻撃者IP調査ダッシュボード
+ * 攻撃者IP調査ダッシュボード - 軽量化バージョン
  */
 document.addEventListener('DOMContentLoaded', function() {
   // アプリケーションの状態
@@ -11,12 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
       ports: ['all']
     },
     pagination: {
-      page: 1,
-      limit: 10,
       total: 0
     },
     data: {
-      connections: [],
       filterOptions: {
         servers: [],
         localIps: [],
@@ -49,11 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     topAttacker: document.getElementById('top-attacker'),
     remoteIpChart: document.getElementById('remote-ip-chart'),
     serverChart: document.getElementById('server-chart'),
-    portChart: document.getElementById('port-chart'),
-    connectionTableBody: document.getElementById('connection-table-body'),
-    paginationInfo: document.getElementById('pagination-info'),
-    prevPageBtn: document.getElementById('prev-page'),
-    nextPageBtn: document.getElementById('next-page')
+    portChart: document.getElementById('port-chart')
   };
 
   // APIのベースURL
@@ -115,8 +108,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'server',
       state.filters.servers,
       (selected) => {
+        console.log('サーバーフィルター変更:', selected);
         state.filters.servers = selected;
-        state.pagination.page = 1;
         refreshDashboard();
       }
     );
@@ -128,7 +121,6 @@ document.addEventListener('DOMContentLoaded', function() {
       state.filters.localIp,
       (selected) => {
         state.filters.localIp = selected;
-        state.pagination.page = 1;
         refreshDashboard();
       }
     );
@@ -140,7 +132,6 @@ document.addEventListener('DOMContentLoaded', function() {
       state.filters.remoteIp,
       (selected) => {
         state.filters.remoteIp = selected;
-        state.pagination.page = 1;
         refreshDashboard();
       }
     );
@@ -152,8 +143,8 @@ document.addEventListener('DOMContentLoaded', function() {
       'port',
       state.filters.ports,
       (selected) => {
+        console.log('ポートフィルター変更:', selected);
         state.filters.ports = selected;
-        state.pagination.page = 1;
         refreshDashboard();
       }
     );
@@ -203,13 +194,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // その他のオプション
     options.forEach((option, index) => {
       const optionElement = document.createElement('option');
-      optionElement.value = `${optionPrefix}-${index}`;
+      optionElement.value = option; // 直接オプション値を使用
       optionElement.textContent = option;
-      optionElement.dataset.actualValue = option;
       element.appendChild(optionElement);
     });
     
     try {
+      // イベントハンドラを一旦解除して、再帰呼び出しを防止
+      $(element).off('change');
+      
       // 複数選択の設定
       $(element).select2({
         placeholder: 'すべて',
@@ -217,38 +210,46 @@ document.addEventListener('DOMContentLoaded', function() {
         multiple: true
       });
       
-      // 現在の値を設定
-      if (selectedValues.includes('all')) {
-        $(element).val(['all']).trigger('change');
-      } else {
-        const selectedOptions = Array.from(element.options)
-          .filter(option => selectedValues.includes(option.dataset.actualValue))
-          .map(option => option.value);
-        
-        $(element).val(selectedOptions).trigger('change');
-      }
+      // イベントフラグ（再帰呼び出し防止用）
+      let isUpdating = false;
       
       // 変更イベントを設定
       $(element).on('change', function() {
+        // 既に更新中なら処理をスキップ
+        if (isUpdating) return;
+        
+        isUpdating = true;
         const selectedOptions = $(this).val() || [];
         
         if (selectedOptions.includes('all')) {
           // 「すべて」が選択されている場合、他のオプションをクリア
-          $(this).val(['all']).trigger('change');
+          $(this).val(['all']);
           onChange(['all']);
         } else if (selectedOptions.length === 0) {
           // 何も選択されていない場合、「すべて」を選択
-          $(this).val(['all']).trigger('change');
+          $(this).val(['all']);
           onChange(['all']);
         } else {
-          // 実際の値に変換
-          const actualValues = Array.from(element.options)
-            .filter(option => selectedOptions.includes(option.value) && option.value !== 'all')
-            .map(option => option.dataset.actualValue);
-          
-          onChange(actualValues);
+          // 実際の値をそのまま使用
+          onChange(selectedOptions);
         }
+        
+        // フラグを戻す
+        setTimeout(() => {
+          isUpdating = false;
+        }, 0);
       });
+      
+      // 現在の値を設定（イベント発火なし）
+      if (selectedValues.includes('all')) {
+        $(element).val(['all']);
+      } else {
+        $(element).val(selectedValues);
+      }
+      
+      // 初期表示を更新
+      $(element).trigger('change.select2');
+      
     } catch (error) {
       console.error('Select2初期化エラー:', error);
       // フォールバック: 通常のセレクトボックスとして機能させる
@@ -257,9 +258,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOptions = Array.from(this.selectedOptions).map(option => option.value);
         const actualValues = selectedOptions.includes('all') ? 
           ['all'] : 
-          Array.from(this.selectedOptions)
-            .filter(option => option.value !== 'all')
-            .map(option => option.dataset.actualValue);
+          selectedOptions;
         
         onChange(actualValues);
       });
@@ -271,8 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       console.log('ダッシュボード更新開始...');
       
-      // 接続データを取得
-      await fetchConnections();
+      // 接続データの総数を取得 (テーブル表示しないが、統計情報のために必要)
+      await fetchConnectionCount();
       
       // 統計データを取得
       await fetchStats();
@@ -289,15 +288,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  // 接続データを取得
-  async function fetchConnections() {
+  // 接続数のみを取得する軽量な関数
+  async function fetchConnectionCount() {
     try {
-      console.log('接続データ取得開始...');
+      console.log('接続数取得開始...');
       
       // APIパラメータの構築
       const params = {
-        page: state.pagination.page,
-        limit: state.pagination.limit
+        page: 1,
+        limit: 1 // 最小限のデータだけを要求
       };
       
       // フィルターの適用
@@ -322,15 +321,12 @@ document.addEventListener('DOMContentLoaded', function() {
       // APIリクエスト
       const response = await axios.get(`${API_BASE_URL}/connections`, { params });
       
-      console.log('接続データ取得成功:', response.data);
-      
-      // 状態を更新
-      state.data.connections = response.data.connections || [];
+      // 総数だけを保存
       state.pagination.total = response.data.total || 0;
       
-      return response.data;
+      return response.data.total;
     } catch (error) {
-      console.error('接続データ取得エラー:', error);
+      console.error('接続数取得エラー:', error);
       if (error.response) {
         console.error('エラー詳細:', error.response.data);
       }
@@ -393,12 +389,6 @@ document.addEventListener('DOMContentLoaded', function() {
     try {
       console.log('UI更新開始...');
       
-      // 接続テーブルを更新
-      updateConnectionTable();
-      
-      // ページネーション情報を更新
-      updatePagination();
-      
       // 統計情報を更新
       updateStats();
       
@@ -408,116 +398,6 @@ document.addEventListener('DOMContentLoaded', function() {
       console.log('UI更新完了');
     } catch (error) {
       console.error('UI更新エラー:', error);
-    }
-  }
-
-  // 接続テーブルを更新
-  function updateConnectionTable() {
-    try {
-      // テーブルをクリア
-      elements.connectionTableBody.innerHTML = '';
-      
-      // データがない場合
-      if (!state.data.connections || state.data.connections.length === 0) {
-        const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        cell.colSpan = 6;
-        cell.textContent = 'データがありません';
-        cell.className = 'no-data';
-        row.appendChild(cell);
-        elements.connectionTableBody.appendChild(row);
-        return;
-      }
-      
-      // 各接続の行を作成
-      state.data.connections.forEach(connection => {
-        const row = document.createElement('tr');
-        
-        // タイムスタンプ
-        const timestampCell = document.createElement('td');
-        timestampCell.textContent = formatTimestamp(connection.timestamp);
-        row.appendChild(timestampCell);
-        
-        // サーバー
-        const serverCell = document.createElement('td');
-        serverCell.textContent = connection.server || '';
-        row.appendChild(serverCell);
-        
-        // ローカルIP
-        const localIpCell = document.createElement('td');
-        localIpCell.textContent = connection.localIp || '';
-        row.appendChild(localIpCell);
-        
-        // ポート
-        const portCell = document.createElement('td');
-        portCell.textContent = connection.port || '';
-        row.appendChild(portCell);
-        
-        // リモートIP
-        const remoteIpCell = document.createElement('td');
-        remoteIpCell.textContent = connection.remoteIp || '';
-        row.appendChild(remoteIpCell);
-        
-        // ステータス
-        const statusCell = document.createElement('td');
-        statusCell.textContent = connection.status || '';
-        if (connection.status) {
-          statusCell.className = `status-${connection.status.toLowerCase()}`;
-        }
-        row.appendChild(statusCell);
-        
-        // テーブルに行を追加
-        elements.connectionTableBody.appendChild(row);
-      });
-    } catch (error) {
-      console.error('テーブル更新エラー:', error);
-    }
-  }
-
-  // タイムスタンプのフォーマット
-  function formatTimestamp(timestamp) {
-    try {
-      if (!timestamp) return '';
-      const date = new Date(timestamp);
-      return date.toLocaleString('ja-JP');
-    } catch (error) {
-      console.error('タイムスタンプフォーマットエラー:', error);
-      return timestamp || '';
-    }
-  }
-
-  // ページネーション情報を更新
-  function updatePagination() {
-    try {
-      // 開始と終了のインデックス
-      const start = state.pagination.total ? (state.pagination.page - 1) * state.pagination.limit + 1 : 0;
-      const end = Math.min(start + state.pagination.limit - 1, state.pagination.total);
-      
-      // ページネーション情報テキスト
-      elements.paginationInfo.textContent = `${start} - ${end} / ${state.pagination.total}`;
-      
-      // 前ページボタン
-      elements.prevPageBtn.disabled = state.pagination.page <= 1;
-      
-      // 次ページボタン
-      elements.nextPageBtn.disabled = end >= state.pagination.total;
-      
-      // ボタンのイベントリスナーを設定
-      elements.prevPageBtn.onclick = () => {
-        if (state.pagination.page > 1) {
-          state.pagination.page--;
-          refreshDashboard();
-        }
-      };
-      
-      elements.nextPageBtn.onclick = () => {
-        if (end < state.pagination.total) {
-          state.pagination.page++;
-          refreshDashboard();
-        }
-      };
-    } catch (error) {
-      console.error('ページネーション更新エラー:', error);
     }
   }
 
