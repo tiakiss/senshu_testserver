@@ -302,8 +302,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOptions = $(this).val() || [];
         console.log(`${optionPrefix}フィルター変更イベント:`, selectedOptions);
         
-        if (selectedOptions.includes('all')) {
-          // 「すべて」が選択されている場合、他のオプションをクリア
+        // 「すべて」と他の選択肢が混在している場合の処理
+        if (selectedOptions.includes('all') && selectedOptions.length > 1) {
+          // 最後に選択されたのが「すべて」なら、他の選択肢をクリア
+          if (selectedOptions[selectedOptions.length - 1] === 'all') {
+            $(this).val(['all']).trigger('change.select2');
+            onChange(['all']);
+          } else {
+            // 「すべて」以外が選択されたなら、「すべて」を除外
+            const filteredOptions = selectedOptions.filter(option => option !== 'all');
+            $(this).val(filteredOptions).trigger('change.select2');
+            onChange(filteredOptions);
+          }
+        } else if (selectedOptions.includes('all')) {
+          // 「すべて」のみが選択されている場合
           $(this).val(['all']).trigger('change.select2');
           onChange(['all']);
         } else if (selectedOptions.length === 0) {
@@ -355,6 +367,9 @@ document.addEventListener('DOMContentLoaded', function() {
       // 統計データを取得
       await fetchStats();
       
+      // サーバー別リモートIP統計データを取得
+      await fetchRemoteIpByServerStats();
+      
       // UIを更新
       updateUI();
       
@@ -364,6 +379,40 @@ document.addEventListener('DOMContentLoaded', function() {
       if (error.response) {
         console.error('エラー詳細:', error.response.data);
       }
+    }
+  }
+  
+  // サーバー別リモートIP統計データを取得
+  async function fetchRemoteIpByServerStats() {
+    try {
+      console.log('サーバー別リモートIP統計データ取得開始...');
+      
+      // APIパラメータの構築
+      const params = {
+        limit: 50 // 上位50件のデータを取得
+      };
+      
+      // フィルターの適用
+      applyFiltersToParams(params);
+      
+      console.log('APIリクエストパラメータ:', params);
+      
+      // APIリクエスト
+      const response = await axios.get(`${API_BASE_URL}/connections/stats/advanced`, { params });
+      
+      console.log('サーバー別リモートIP統計データ取得成功:', response.data);
+      
+      // 状態を更新
+      state.data.stats.remoteIpByServer = response.data.data || [];
+      state.data.serverList = response.data.servers || [];
+      
+      return response.data;
+    } catch (error) {
+      console.error('サーバー別リモートIP統計データ取得エラー:', error);
+      if (error.response) {
+        console.error('エラー詳細:', error.response.data);
+      }
+      throw error;
     }
   }
 
