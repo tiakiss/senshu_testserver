@@ -517,6 +517,9 @@ document.addEventListener('DOMContentLoaded', function() {
   // チャートを更新
   function updateCharts() {
     try {
+      // サーバー別リモートIPの集計チャート
+      updateRemoteIpByServerChart();
+      
       // リモートIPチャート
       updateChart(
         'remoteIp',
@@ -539,6 +542,130 @@ document.addEventListener('DOMContentLoaded', function() {
       );
     } catch (error) {
       console.error('チャート更新エラー:', error);
+    }
+  }
+  
+  // サーバー別リモートIP集計チャートを更新
+  function updateRemoteIpByServerChart() {
+    try {
+      // データがない場合
+      if (!state.data.stats.remoteIpByServer || state.data.stats.remoteIpByServer.length === 0) {
+        // 既存のチャートを破棄
+        if (state.charts.remoteIpByServer) {
+          state.charts.remoteIpByServer.destroy();
+          state.charts.remoteIpByServer = null;
+        }
+        
+        // キャンバスにメッセージを表示
+        const ctx = elements.remoteIpByServerChart.getContext('2d');
+        ctx.clearRect(0, 0, elements.remoteIpByServerChart.width, elements.remoteIpByServerChart.height);
+        ctx.font = '16px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillText('データがありません', elements.remoteIpByServerChart.width / 2, elements.remoteIpByServerChart.height / 2);
+        
+        return;
+      }
+      
+      // サーバーごとに色を割り当て
+      const serverColors = {};
+      const allServers = state.data.serverList || [];
+      
+      allServers.forEach((server, index) => {
+        serverColors[server] = getChartColor(index);
+      });
+      
+      // リモートIPをグループ化
+      const remoteIps = [...new Set(state.data.stats.remoteIpByServer.map(item => item.remote_ip))];
+      const datasets = [];
+      
+      // トップ10のリモートIPに絞る
+      const topRemoteIps = remoteIps.slice(0, 10);
+      
+      // サーバーごとのデータセットを作成
+      allServers.forEach((server) => {
+        const data = [];
+        
+        // 各リモートIPについて、そのサーバーの接続数を取得
+        topRemoteIps.forEach(ip => {
+          const match = state.data.stats.remoteIpByServer.find(
+            item => item.server === server && item.remote_ip === ip
+          );
+          
+          data.push(match ? match.count : 0);
+        });
+        
+        // 接続がある場合のみデータセットに追加
+        if (data.some(val => val > 0)) {
+          datasets.push({
+            label: server,
+            data: data,
+            backgroundColor: serverColors[server],
+            borderColor: serverColors[server],
+            borderWidth: 1
+          });
+        }
+      });
+      
+      // データの準備
+      const chartData = {
+        labels: topRemoteIps,
+        datasets: datasets
+      };
+      
+      // チャートのオプション
+      const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            stacked: true,
+            title: {
+              display: true,
+              text: 'リモートIP'
+            }
+          },
+          y: {
+            stacked: true,
+            title: {
+              display: true,
+              text: '接続数'
+            }
+          }
+        },
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                return `${context.dataset.label}: ${context.raw}回`;
+              }
+            }
+          },
+          legend: {
+            position: 'top'
+          },
+          title: {
+            display: true,
+            text: 'サーバー別リモートIP接続分布'
+          }
+        }
+      };
+      
+      // 既存のチャートを破棄
+      if (state.charts.remoteIpByServer) {
+        state.charts.remoteIpByServer.destroy();
+      }
+      
+      // 新しいチャートを作成
+      const ctx = elements.remoteIpByServerChart.getContext('2d');
+      state.charts.remoteIpByServer = new Chart(ctx, {
+        type: 'bar',
+        data: chartData,
+        options: options
+      });
+    } catch (error) {
+      console.error('サーバー別リモートIPチャート更新エラー:', error);
     }
   }
 
