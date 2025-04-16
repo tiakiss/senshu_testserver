@@ -3,6 +3,7 @@ RewriteEngine On
 
 # APIへのリクエストを処理
 RewriteRule ^api/v1/connections/filters/?$ api/v1/connections/filters/index.php [L,QSA]
+RewriteRule ^api/v1/connections/stats/advanced/?$ api/v1/connections/stats/advanced/index.php [L,QSA]
 RewriteRule ^api/v1/connections/stats/?$ api/v1/connections/stats/index.php [L,QSA]
 RewriteRule ^api/v1/connections/?$ api/v1/connections/index.php [L,QSA]
 

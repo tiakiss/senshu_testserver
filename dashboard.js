@@ -25,13 +25,15 @@ document.addEventListener('DOMContentLoaded', function() {
       stats: {
         remoteIp: [],
         server: [],
-        port: []
+        port: [],
+        remoteIpByServer: []
       }
     },
     charts: {
       remoteIp: null,
       server: null,
-      port: null
+      port: null,
+      remoteIpByServer: null
     }
   };
 
@@ -52,7 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
     topAttacker: document.getElementById('top-attacker'),
     remoteIpChart: document.getElementById('remote-ip-chart'),
     serverChart: document.getElementById('server-chart'),
-    portChart: document.getElementById('port-chart')
+    portChart: document.getElementById('port-chart'),
+    remoteIpByServerChart: document.getElementById('remote-ip-by-server-chart')
   };
 
   // APIのベースURL
