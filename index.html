@@ -99,11 +99,27 @@
                 </div>
             </section>
             
-            <!-- サーバー別リモートIPテーブルセクション -->
+            <!-- データテーブルセクション（新規追加） -->
             <section class="data-table-section">
-                <h2>サーバー別リモートIP接続データ</h2>
-                <div id="remote-ip-table-container" class="table-container">
-                    <!-- テーブルはJavaScriptで動的に挿入 -->
+                <div class="table-header">
+                    <h3>サーバー別リモートIP接続詳細</h3>
+                    <button id="copy-table" class="copy-button">
+                        <span>テーブルをコピー</span>
+                    </button>
+                </div>
+                <div class="table-container">
+                    <table id="remote-ip-server-table" class="data-table">
+                        <thead>
+                            <tr id="table-header-row">
+                                <th>リモートIP</th>
+                                <!-- サーバー列はJavaScriptで動的に追加されます -->
+                                <th>合計</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- データ行はJavaScriptで動的に生成されます -->
+                        </tbody>
+                    </table>
                 </div>
             </section>
         </div>

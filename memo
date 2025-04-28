@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# 日付パラメータが提供されているか確認
+if [ $# -ne 1 ]; then
+    echo "使用方法: $0 YYYYMMDD"
+    exit 1
+fi
+
+DATE=$1
+SERVERS=("nsv7" "nsv5" "sv5" "sv7" "sv10" "sv11" "large2" "dhs1" "dhs2")
+PASSWORD='KFuD8qaZ'
+USER="senshu"
+DOMAIN="s-graphi.jp"
+REMOTE_PATH="/home/senshu/log/netstat"
+LOCAL_PATH="/home/senshu/log/netstat"
+
+# 各サーバーをループしてファイルをダウンロード
+for SERVER in "${SERVERS[@]}"; do
+    # 修正：ファイル名の変数展開を正しく行う
+    TARGET_FILE="$LOCAL_PATH/${SERVER}.$DOMAIN_$DATE.csv"
+    REMOTE_FILE="$REMOTE_PATH/${SERVER}.$DOMAIN_$DATE.csv"
+    
+    # ファイルが既に存在するか確認
+    if [ -f "$TARGET_FILE" ]; then
+        read -p "$TARGET_FILE が既に存在します。上書きしますか？ (y/n): " ANSWER
+        if [[ ! "$ANSWER" =~ ^[Yy]$ ]]; then
+            echo "$SERVER.$DOMAIN からのダウンロードをスキップします..."
+            continue
+        fi
+    fi
+    
+    echo "$SERVER.$DOMAIN からダウンロード中..."
+    # 修正：ファイル名の構築方法を修正
+    sshpass -p "$PASSWORD" scp "$USER@$SERVER.$DOMAIN:$REMOTE_PATH/${SERVER}.$DOMAIN"_"$DATE.csv" "$LOCAL_PATH/"
+done
+
+echo "すべてのダウンロード完了しました！"
